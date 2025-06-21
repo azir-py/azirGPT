@@ -1,79 +1,208 @@
--- SmartAI_Lib.lua (Standalone, no HTTP)
-local SmartAI = {}
+-- Rayfield-Style UI Library (Full Feature Set + Notifications + Toggle Keybind)
+local MyRayLib = {}
 
--- Code Snippet Generator (simple pattern logic)
-local function generateCode(lang, topic)
-	topic = topic:lower()
-	if lang == "lua" then
-		if topic:find("gui") then
-			return [[
-local gui = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 100)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)]]
-		elseif topic:find("function") then
-			return "function greet(name)\n\tprint(\"Hello, \" .. name)\nend"
-		end
-	elseif lang == "python" then
-		if topic:find("loop") then
-			return "for i in range(10):\n\tprint('Hello, world!')"
-		end
-	end
-	return "-- Sorry, I don’t know how to code that (yet)."
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Create BlurEffect
+local blur = Instance.new("BlurEffect")
+blur.Size = 0
+blur.Parent = game:GetService("Lighting")
+TweenService:Create(blur, TweenInfo.new(0.5), {Size = 12}):Play()
+
+-- Create UI container
+local gui = Instance.new("ScreenGui")
+gui.Name = "MyRayLibUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Fade in effect
+gui.Enabled = false
+wait(0.2)
+gui.Enabled = true
+
+-- Toggle UI keybind (RightCtrl)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightControl then
+        gui.Enabled = not gui.Enabled
+    end
+end)
+
+-- UI Utility
+local function createUICorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 6)
+    corner.Parent = parent
+    return corner
 end
 
--- Story generator
-local function generateStory(topic)
-	return "Once upon a time, in a world of " .. topic .. ", a brave adventurer rose to shape history. Through fire and storm, their legacy echoed forever."
+-- Notification System
+function MyRayLib:Notify(titleText, msgText, duration)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 300, 0, 80)
+    notif.Position = UDim2.new(1, -320, 1, -100)
+    notif.AnchorPoint = Vector2.new(1, 1)
+    notif.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    notif.Parent = gui
+    createUICorner(notif, 8)
+
+    local title = Instance.new("TextLabel", notif)
+    title.Size = UDim2.new(1, -10, 0, 25)
+    title.Position = UDim2.new(0, 5, 0, 5)
+    title.Text = titleText
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.BackgroundTransparency = 1
+    title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local message = Instance.new("TextLabel", notif)
+    message.Size = UDim2.new(1, -10, 0, 45)
+    message.Position = UDim2.new(0, 5, 0, 30)
+    message.Text = msgText
+    message.Font = Enum.Font.Gotham
+    message.TextSize = 14
+    message.TextColor3 = Color3.fromRGB(200, 200, 200)
+    message.BackgroundTransparency = 1
+    message.TextWrapped = true
+    message.TextXAlignment = Enum.TextXAlignment.Left
+    message.TextYAlignment = Enum.TextYAlignment.Top
+
+    TweenService:Create(notif, TweenInfo.new(0.3), {Position = UDim2.new(1, -320, 1, -120)}):Play()
+
+    task.delay(duration or 3, function()
+        TweenService:Create(notif, TweenInfo.new(0.3), {Position = UDim2.new(1, 10, 1, -100)}):Play()
+        task.wait(0.4)
+        notif:Destroy()
+    end)
 end
 
--- Response engine
-function SmartAI.GenerateResponse(userInput)
-	local msg = userInput:lower()
+-- UI Window Builder
+function MyRayLib:CreateWindow(config)
+    local window = Instance.new("Frame")
+    window.Size = UDim2.new(0, 520, 0, 400)
+    window.Position = UDim2.new(0.5, -260, 0.5, -200)
+    window.AnchorPoint = Vector2.new(0.5, 0.5)
+    window.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    window.Parent = gui
+    window.ClipsDescendants = true
+    createUICorner(window, 10)
 
-	-- Math
-	if msg:match("what is (%d+)%s*([%+%-%*/])%s*(%d+)") then
-		local a, op, b = msg:match("what is (%d+)%s*([%+%-%*/])%s*(%d+)")
-		a, b = tonumber(a), tonumber(b)
-		local result = loadstring("return " .. a .. op .. b)()
-		return "That equals **" .. tostring(result) .. "**."
-	end
+    local titleBar = Instance.new("TextLabel", window)
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.Text = config.Title or "Window"
+    titleBar.Font = Enum.Font.GothamBold
+    titleBar.TextSize = 18
+    titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    createUICorner(titleBar, 10)
 
-	-- Code request
-	if msg:match("write lua code for (.+)") then
-		local topic = msg:match("write lua code for (.+)")
-		return "Here’s a Lua snippet for that:\n```lua\n" .. generateCode("lua", topic) .. "\n```"
-	end
+    local tabContainer = Instance.new("Frame", window)
+    tabContainer.Size = UDim2.new(1, 0, 1, -40)
+    tabContainer.Position = UDim2.new(0, 0, 0, 40)
+    tabContainer.BackgroundTransparency = 1
 
-	if msg:match("write python code for (.+)") then
-		local topic = msg:match("write python code for (.+)")
-		return "Sure, here’s some Python:\n```python\n" .. generateCode("python", topic) .. "\n```"
-	end
+    local tabs = {}
+    local tabButtons = {}
 
-	-- Story
-	if msg:match("tell me a story about (.+)") then
-		local topic = msg:match("tell me a story about (.+)")
-		return generateStory(topic)
-	end
+    function MyRayLib:CreateTab(name)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0, 100, 0, 30)
+        button.Text = name
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        button.Font = Enum.Font.Gotham
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Parent = titleBar
+        createUICorner(button, 6)
 
-	-- Greetings
-	if msg:find("hello") or msg:find("hi") then
-		return "Hello there! How can I help you today?"
-	end
+        local tab = Instance.new("ScrollingFrame")
+        tab.Size = UDim2.new(1, 0, 1, 0)
+        tab.CanvasSize = UDim2.new(0, 0, 0, 0)
+        tab.BackgroundTransparency = 1
+        tab.Visible = false
+        tab.Parent = tabContainer
+        Instance.new("UIListLayout", tab)
 
-	if msg:find("who are you") then
-		return "I’m a simulated AI written in Lua. Not as smart as LLaMA, but I try. 😅"
-	end
+        button.MouseButton1Click:Connect(function()
+            for _, t in pairs(tabs) do t.Visible = false end
+            tab.Visible = true
+        end)
 
-	if msg:find("help") then
-		return [[
-I can:
-- Do simple math (e.g., what is 2 + 2)
-- Generate Lua/Python code (e.g., write lua code for gui)
-- Tell stories (e.g., tell me a story about dragons)]]
-	end
+        table.insert(tabs, tab)
+        table.insert(tabButtons, button)
 
-	return "Hmm... I don’t understand that yet, but I’m learning!"
+        local api = {}
+
+        function api:AddLabel(text)
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, -10, 0, 30)
+            lbl.Text = text
+            lbl.TextColor3 = Color3.new(1, 1, 1)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 14
+            lbl.Parent = tab
+        end
+
+        function api:AddToggle(info)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Text = "[ ] " .. info.Name
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            btn.TextColor3 = Color3.new(1, 1, 1)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            btn.Parent = tab
+            createUICorner(btn, 6)
+            local state = info.Default or false
+            btn.MouseButton1Click:Connect(function()
+                state = not state
+                btn.Text = (state and "[✓] " or "[ ] ") .. info.Name
+                if info.Callback then info.Callback(state) end
+            end)
+        end
+
+        function api:AddInput(info)
+            local box = Instance.new("TextBox")
+            box.Size = UDim2.new(1, -10, 0, 30)
+            box.PlaceholderText = info.Placeholder or "Type here..."
+            box.Text = ""
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 14
+            box.TextColor3 = Color3.new(1, 1, 1)
+            box.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+            createUICorner(box, 6)
+            box.Parent = tab
+            box.FocusLost:Connect(function(enter)
+                if enter and info.Callback then info.Callback(box.Text) end
+            end)
+        end
+
+        function api:AddSlider(info)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Text = info.Name .. ": " .. tostring(info.Default)
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            btn.TextColor3 = Color3.new(1, 1, 1)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            btn.Parent = tab
+            createUICorner(btn, 6)
+            local val = info.Default or info.Min
+            btn.MouseButton1Click:Connect(function()
+                val = val + 1
+                if val > info.Max then val = info.Min end
+                btn.Text = info.Name .. ": " .. val
+                if info.Callback then info.Callback(val) end
+            end)
+        end
+
+        return api
+    end
 end
 
-return SmartAI
+return MyRayLib
