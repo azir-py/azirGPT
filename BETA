@@ -1,0 +1,79 @@
+-- SmartAI_Lib.lua (Standalone, no HTTP)
+local SmartAI = {}
+
+-- Code Snippet Generator (simple pattern logic)
+local function generateCode(lang, topic)
+	topic = topic:lower()
+	if lang == "lua" then
+		if topic:find("gui") then
+			return [[
+local gui = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)]]
+		elseif topic:find("function") then
+			return "function greet(name)\n\tprint(\"Hello, \" .. name)\nend"
+		end
+	elseif lang == "python" then
+		if topic:find("loop") then
+			return "for i in range(10):\n\tprint('Hello, world!')"
+		end
+	end
+	return "-- Sorry, I don’t know how to code that (yet)."
+end
+
+-- Story generator
+local function generateStory(topic)
+	return "Once upon a time, in a world of " .. topic .. ", a brave adventurer rose to shape history. Through fire and storm, their legacy echoed forever."
+end
+
+-- Response engine
+function SmartAI.GenerateResponse(userInput)
+	local msg = userInput:lower()
+
+	-- Math
+	if msg:match("what is (%d+)%s*([%+%-%*/])%s*(%d+)") then
+		local a, op, b = msg:match("what is (%d+)%s*([%+%-%*/])%s*(%d+)")
+		a, b = tonumber(a), tonumber(b)
+		local result = loadstring("return " .. a .. op .. b)()
+		return "That equals **" .. tostring(result) .. "**."
+	end
+
+	-- Code request
+	if msg:match("write lua code for (.+)") then
+		local topic = msg:match("write lua code for (.+)")
+		return "Here’s a Lua snippet for that:\n```lua\n" .. generateCode("lua", topic) .. "\n```"
+	end
+
+	if msg:match("write python code for (.+)") then
+		local topic = msg:match("write python code for (.+)")
+		return "Sure, here’s some Python:\n```python\n" .. generateCode("python", topic) .. "\n```"
+	end
+
+	-- Story
+	if msg:match("tell me a story about (.+)") then
+		local topic = msg:match("tell me a story about (.+)")
+		return generateStory(topic)
+	end
+
+	-- Greetings
+	if msg:find("hello") or msg:find("hi") then
+		return "Hello there! How can I help you today?"
+	end
+
+	if msg:find("who are you") then
+		return "I’m a simulated AI written in Lua. Not as smart as LLaMA, but I try. 😅"
+	end
+
+	if msg:find("help") then
+		return [[
+I can:
+- Do simple math (e.g., what is 2 + 2)
+- Generate Lua/Python code (e.g., write lua code for gui)
+- Tell stories (e.g., tell me a story about dragons)]]
+	end
+
+	return "Hmm... I don’t understand that yet, but I’m learning!"
+end
+
+return SmartAI
