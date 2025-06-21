@@ -1,4 +1,4 @@
--- Rayfield-Style UI Library (Full Feature Set + Notifications + Toggle Keybind)
+-- Rayfield-Style UI Library (Full Feature Set + Notifications + Toggle Keybind + Draggable + Icon)
 local MyRayLib = {}
 
 local TweenService = game:GetService("TweenService")
@@ -22,14 +22,8 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Fade in effect
 gui.Enabled = false
-wait(0.2)
-gui.Enabled = true
-
--- Toggle UI keybind (RightCtrl)
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightControl then
-        gui.Enabled = not gui.Enabled
-    end
+task.delay(0.2, function()
+    gui.Enabled = true
 end)
 
 -- UI Utility
@@ -38,6 +32,21 @@ local function createUICorner(parent, radius)
     corner.CornerRadius = UDim.new(0, radius or 6)
     corner.Parent = parent
     return corner
+end
+
+local function createUITextLabel(parent, size, pos, text, font, textSize, textColor, bgTransparency, alignX, alignY)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = size
+    lbl.Position = pos or UDim2.new(0, 0, 0, 0)
+    lbl.Text = text or ""
+    lbl.Font = font or Enum.Font.Gotham
+    lbl.TextSize = textSize or 14
+    lbl.TextColor3 = textColor or Color3.new(1,1,1)
+    lbl.BackgroundTransparency = bgTransparency or 1
+    lbl.TextXAlignment = alignX or Enum.TextXAlignment.Left
+    lbl.TextYAlignment = alignY or Enum.TextYAlignment.Center
+    lbl.Parent = parent
+    return lbl
 end
 
 -- Notification System
@@ -50,27 +59,8 @@ function MyRayLib:Notify(titleText, msgText, duration)
     notif.Parent = gui
     createUICorner(notif, 8)
 
-    local title = Instance.new("TextLabel", notif)
-    title.Size = UDim2.new(1, -10, 0, 25)
-    title.Position = UDim2.new(0, 5, 0, 5)
-    title.Text = titleText
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.BackgroundTransparency = 1
-    title.TextXAlignment = Enum.TextXAlignment.Left
-
-    local message = Instance.new("TextLabel", notif)
-    message.Size = UDim2.new(1, -10, 0, 45)
-    message.Position = UDim2.new(0, 5, 0, 30)
-    message.Text = msgText
-    message.Font = Enum.Font.Gotham
-    message.TextSize = 14
-    message.TextColor3 = Color3.fromRGB(200, 200, 200)
-    message.BackgroundTransparency = 1
-    message.TextWrapped = true
-    message.TextXAlignment = Enum.TextXAlignment.Left
-    message.TextYAlignment = Enum.TextYAlignment.Top
+    local title = createUITextLabel(notif, UDim2.new(1, -10, 0, 25), UDim2.new(0, 5, 0, 5), titleText, Enum.Font.GothamBold, 16, Color3.fromRGB(255,255,255), 1, Enum.TextXAlignment.Left)
+    local message = createUITextLabel(notif, UDim2.new(1, -10, 0, 45), UDim2.new(0, 5, 0, 30), msgText, Enum.Font.Gotham, 14, Color3.fromRGB(200,200,200), 1, Enum.TextXAlignment.Left, Enum.TextYAlignment.Top)
 
     TweenService:Create(notif, TweenInfo.new(0.3), {Position = UDim2.new(1, -320, 1, -120)}):Play()
 
@@ -81,7 +71,47 @@ function MyRayLib:Notify(titleText, msgText, duration)
     end)
 end
 
--- UI Window Builder
+-- Draggable helper function
+local function makeDraggable(frame, dragArea)
+    dragArea = dragArea or frame
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    dragArea.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragArea.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                math.clamp(startPos.X.Scale, 0, 1),
+                math.clamp(startPos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - frame.AbsoluteSize.X),
+                math.clamp(startPos.Y.Scale, 0, 1),
+                math.clamp(startPos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - frame.AbsoluteSize.Y)
+            )
+        end
+    end)
+end
+
+-- Main window creation
 function MyRayLib:CreateWindow(config)
     local window = Instance.new("Frame")
     window.Size = UDim2.new(0, 520, 0, 400)
@@ -92,15 +122,50 @@ function MyRayLib:CreateWindow(config)
     window.ClipsDescendants = true
     createUICorner(window, 10)
 
-    local titleBar = Instance.new("TextLabel", window)
+    -- Title bar
+    local titleBar = Instance.new("Frame", window)
     titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.Text = config.Title or "Window"
-    titleBar.Font = Enum.Font.GothamBold
-    titleBar.TextSize = 18
     titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
     createUICorner(titleBar, 10)
 
+    -- Title text
+    local titleLabel = Instance.new("TextLabel", titleBar)
+    titleLabel.Size = UDim2.new(1, -40, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.Text = config.Title or "Window"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 18
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+    -- Custom icon support (optional)
+    local iconImage = nil
+    if config.IconUrl then
+        iconImage = Instance.new("ImageLabel", titleBar)
+        iconImage.Size = UDim2.new(0, 28, 0, 28)
+        iconImage.Position = UDim2.new(0, 8, 0, 6)
+        iconImage.BackgroundTransparency = 1
+        iconImage.Image = config.IconUrl
+    end
+
+    -- Close/Open button
+    local toggleBtn = Instance.new("TextButton", titleBar)
+    toggleBtn.Size = UDim2.new(0, 30, 0, 30)
+    toggleBtn.Position = UDim2.new(1, -38, 0, 5)
+    toggleBtn.Text = "×"
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextSize = 20
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    createUICorner(toggleBtn, 6)
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        window.Visible = not window.Visible
+    end)
+
+    -- Tab container
     local tabContainer = Instance.new("Frame", window)
     tabContainer.Size = UDim2.new(1, 0, 1, -40)
     tabContainer.Position = UDim2.new(0, 0, 0, 40)
@@ -109,14 +174,27 @@ function MyRayLib:CreateWindow(config)
     local tabs = {}
     local tabButtons = {}
 
+    -- Tab buttons container
+    local tabButtonsFrame = Instance.new("Frame", titleBar)
+    tabButtonsFrame.Size = UDim2.new(1, -80, 1, 0)
+    tabButtonsFrame.Position = UDim2.new(0, 40, 0, 0)
+    tabButtonsFrame.BackgroundTransparency = 1
+    tabButtonsFrame.ClipsDescendants = true
+
+    local UIListLayout = Instance.new("UIListLayout", tabButtonsFrame)
+    UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout.Padding = UDim.new(0, 6)
+
+    -- Create a tab
     function MyRayLib:CreateTab(name)
         local button = Instance.new("TextButton")
-        button.Size = UDim2.new(0, 100, 0, 30)
+        button.Size = UDim2.new(0, 100, 1, 0)
         button.Text = name
         button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         button.Font = Enum.Font.Gotham
         button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.Parent = titleBar
+        button.Parent = tabButtonsFrame
         createUICorner(button, 6)
 
         local tab = Instance.new("ScrollingFrame")
@@ -125,11 +203,18 @@ function MyRayLib:CreateWindow(config)
         tab.BackgroundTransparency = 1
         tab.Visible = false
         tab.Parent = tabContainer
-        Instance.new("UIListLayout", tab)
+
+        local listLayout = Instance.new("UIListLayout", tab)
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Padding = UDim.new(0, 8)
 
         button.MouseButton1Click:Connect(function()
             for _, t in pairs(tabs) do t.Visible = false end
+            for _, b in pairs(tabButtons) do
+                b.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            end
             tab.Visible = true
+            button.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
         end)
 
         table.insert(tabs, tab)
@@ -139,18 +224,20 @@ function MyRayLib:CreateWindow(config)
 
         function api:AddLabel(text)
             local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, -10, 0, 30)
+            lbl.Size = UDim2.new(1, -20, 0, 30)
             lbl.Text = text
             lbl.TextColor3 = Color3.new(1, 1, 1)
             lbl.BackgroundTransparency = 1
             lbl.Font = Enum.Font.Gotham
             lbl.TextSize = 14
+            lbl.TextWrapped = true
             lbl.Parent = tab
+            return lbl
         end
 
         function api:AddToggle(info)
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Size = UDim2.new(1, -20, 0, 30)
             btn.Text = "[ ] " .. info.Name
             btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
             btn.TextColor3 = Color3.new(1, 1, 1)
@@ -162,13 +249,16 @@ function MyRayLib:CreateWindow(config)
             btn.MouseButton1Click:Connect(function()
                 state = not state
                 btn.Text = (state and "[✓] " or "[ ] ") .. info.Name
-                if info.Callback then info.Callback(state) end
+                if info.Callback then
+                    info.Callback(state)
+                end
             end)
+            return btn
         end
 
         function api:AddInput(info)
             local box = Instance.new("TextBox")
-            box.Size = UDim2.new(1, -10, 0, 30)
+            box.Size = UDim2.new(1, -20, 0, 30)
             box.PlaceholderText = info.Placeholder or "Type here..."
             box.Text = ""
             box.Font = Enum.Font.Gotham
@@ -177,32 +267,89 @@ function MyRayLib:CreateWindow(config)
             box.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
             createUICorner(box, 6)
             box.Parent = tab
+            box.ClearTextOnFocus = false
             box.FocusLost:Connect(function(enter)
-                if enter and info.Callback then info.Callback(box.Text) end
+                if enter and info.Callback then
+                    info.Callback(box.Text)
+                end
             end)
+            return box
         end
 
         function api:AddSlider(info)
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -10, 0, 30)
-            btn.Text = info.Name .. ": " .. tostring(info.Default)
-            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            btn.TextColor3 = Color3.new(1, 1, 1)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 14
-            btn.Parent = tab
-            createUICorner(btn, 6)
-            local val = info.Default or info.Min
-            btn.MouseButton1Click:Connect(function()
-                val = val + 1
-                if val > info.Max then val = info.Min end
-                btn.Text = info.Name .. ": " .. val
-                if info.Callback then info.Callback(val) end
+            local sliderFrame = Instance.new("Frame")
+            sliderFrame.Size = UDim2.new(1, -20, 0, 40)
+            sliderFrame.BackgroundTransparency = 1
+            sliderFrame.Parent = tab
+
+            local label = Instance.new("TextLabel", sliderFrame)
+            label.Size = UDim2.new(1, 0, 0, 20)
+            label.BackgroundTransparency = 1
+            label.Text = info.Name .. ": " .. tostring(info.Default)
+            label.Font = Enum.Font.Gotham
+            label.TextSize = 14
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.TextXAlignment = Enum.TextXAlignment.Left
+
+            local sliderBar = Instance.new("Frame", sliderFrame)
+            sliderBar.Size = UDim2.new(1, 0, 0, 10)
+            sliderBar.Position = UDim2.new(0, 0, 0, 25)
+            sliderBar.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            createUICorner(sliderBar, 6)
+
+            local sliderFill = Instance.new("Frame", sliderBar)
+            sliderFill.Size = UDim2.new((info.Default - info.Min) / (info.Max - info.Min), 0, 1, 0)
+            sliderFill.BackgroundColor3 = Color3.fromRGB(100, 100, 180)
+            createUICorner(sliderFill, 6)
+
+            local dragging = false
+            sliderBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = true
+                end
             end)
+            sliderBar.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                end
+            end)
+            sliderBar.InputChanged:Connect(function(input)
+                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local relX = math.clamp(input.Position.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+                    local val = info.Min + (relX / sliderBar.AbsoluteSize.X) * (info.Max - info.Min)
+                    val = math.floor(val)
+                    sliderFill.Size = UDim2.new((val - info.Min) / (info.Max - info.Min), 0, 1, 0)
+                    label.Text = info.Name .. ": " .. tostring(val)
+                    if info.Callback then
+                        info.Callback(val)
+                    end
+                end
+            end)
+
+            return sliderFrame
         end
 
         return api
     end
+
+    -- Show first tab automatically if exists
+    task.spawn(function()
+        task.wait(0.1)
+        if #tabButtons > 0 then
+            tabButtons[1].MouseButton1Click:Wait()
+        end
+    end)
+
+    makeDraggable(window, titleBar)
+
+    return window
 end
+
+-- Toggle UI keybind (RightCtrl)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightControl then
+        gui.Enabled = not gui.Enabled
+    end
+end)
 
 return MyRayLib
